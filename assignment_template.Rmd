@@ -1,0 +1,208 @@
+---
+title: "Assignment Template"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-11-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Libraries, include=FALSE}
+library(tidyverse)
+library(palmerpenguins)
+library(here)
+library(janitor)
+here::here()
+library(ragg)
+library(svglite)
+library(ggplot2)
+library(gplots)
+library(MASS)
+library(effectsize)
+```
+
+*Packages required for analysis ragg, tidyverse, palmerpenguins, here, janitor, svglite, ggplot2, gplots, MASS, effectsize*
+
+## QUESTION 01: Data Visualisation for Science Communication
+
+### a) Provide your figure here:
+
+```{r incorrect Exploratory figure creation, echo=TRUE}
+
+source(here("functions", "cleaning.R"))
+# -------------------------------------
+
+# ---- Load the raw data ----
+penguins_raw <- read_csv(here("data", "penguins_raw.csv"), show_col_types = FALSE)
+# -------------------------------------
+
+# ---- Using our functions from the functions script ----
+penguins_colclean <- clean_column_names(penguins_raw)
+# ------------------------------------------------------
+#---removing NA values 
+penguinscolclean <- remove_NA(penguins_raw)
+# ---- Save the clean data ----
+write_csv(penguins_colclean, here("data", "penguins_colclean.csv"))
+# -------------------------------------
+
+# ---- Check the output ----
+names(penguins_colclean)
+
+ 
+# checking and saving the raw dataset
+head(penguins_raw)
+####preserve raw data
+write_csv(penguins_raw,here("data","penguins_raw.csv"))
+
+### making a violin plot:
+##### Subset the columns and remove NA values
+head(penguins_colclean)
+{penguins_flippers <- penguins_colclean %>% 
+  dplyr::select(sex, flipper_length_mm) %>%
+  drop_na()}
+head(penguins_flippers)
+
+flipper_violin <- ggplot(
+    data = penguins_flippers, 
+    aes(x = sex, 
+        y = flipper_length_mm)) + 
+    geom_violin(aes(color = sex), 
+                show.legend = FALSE) +
+  ylim(100,500) +
+  geom_jitter(
+        aes(color = "red"),
+        alpha = 0.8,
+        show.legend = FALSE, 
+        position = position_jitter(width = 0.8, seed = 0))+
+   coord_flip() +
+  labs(x = "Sex",
+         y = "Flipper Length (mm)")
+flipper_violin
+
+#### EXPORTING THE FIGURE
+agg_png("figures/flipper_violin_by_sex.png", 
+        width = 20, 
+        height = 20, 
+        units = "cm", 
+        res = 300, 
+        scaling = 1)
+print(flipper_violin)
+dev.off()
+```
+
+### b) Write about how your design choices mislead the reader about the underlying data (100-300 words).
+
+Flipped X-Y axes mislead interpretations of relationships in terms of which is the dependent and which is the independent variable. Colour scheme: red/green for the violin plot outline does not take into account visualisation for those who are red/green colour blind,and does not reflect relationship to the uniformly coloured jitter for male and female. A better option would be to choose two different distinct colours, and match jitter colour by 'male' and 'female' so we can see where there is overlap and where distinct differences are. The 'flipper length(mm) axis has been enlarged beyond what is necessary, leading ot the data being condensed to a small fraction of the graph. This means readers cannot interpret differences between the violin plots effectively by diminishing the difference between the two. The plot is not sufficiently large length-wise, leading to some jitter points being lost from the plot, this could be especially significant if there was a concentration of points (reflecting raw data) that is not on the plot, or if outliers were present that would influence statistical analysis and these were not recognised from an original exploratory plot.
+
+## QUESTION 2: Data Pipeline
+
+------------------------------------------------------------------------
+
+*Data analysis of penguin culmer qualities by species across three penguin species across the Palmer Penguin dataset.*
+
+### Introduction
+
+Collections of penguin trait measurements through the Palmer Station long-term ecological research centre, has allowed the exploration of relationships and evolution in hot-spots where selection still has a broad 'evolutionary landscape' of unfilled niches and qualities on which to shape species evolution. Understanding the differences between species across Antarctic archipelagos such as the Palmer provides key insight into such evolution and development, as well as greater understanding of specific species and intraspecific phenotypic differences and evolutionary drivers. This data analysis aims to explore just two of the many measured traits in the package:differences in culmen length, and depth, across three species of *Pygoscelis* penguins which breed on islands across the Western Atlantic Peninsula Palmer archipelago. (Horst *et al*. 2022).
+
+```{r Data Analysis exploratoiry figure, echo=TRUE}
+
+## subset the data and remove NA
+
+{penguins_culmen <- penguins_colclean %>% 
+  dplyr::select(species, culmen_length_mm, culmen_depth_mm) %>%
+  drop_na()
+}
+#### defining species colours by Palmer Penguins Package
+species_colours <- c("Adelie Penguin (Pygoscelis adeliae)" = "darkorange", 
+                    "Chinstrap penguin (Pygoscelis antarctica)" = "purple", 
+                    "Gentoo penguin (Pygoscelis papua)" = "cyan4")
+#### plotting:
+culmenbyspeciesplot<- ggplot(penguins_culmen, aes(culmen_length_mm, culmen_depth_mm)) +
+  geom_point(aes(color=species), size=0.8) +
+  scale_color_manual(values = species_colours)+
+  labs(x = "Culmen Length (mm)",
+         y = "Culmen Depth (mm)")+
+   theme_bw()
+
+culmenbyspeciesplot
+
+#### exporting the figure
+agg_png("figures/penguin_culmen_qualities_by_species.png", 
+        width = 20, 
+        height = 20, 
+        units = "cm", 
+        res = 300, 
+        scaling = 1)
+print(culmenbyspeciesplot)
+```
+
+### Hypothesis
+
+H~0~: *There is no significant difference in culmen depth and culmen length mean vectors across species*. (H~0~: μ~1~ = μ~2~ = μk)
+
+H~A~: T*here are significant differences in at least one of: culmen depth and length means, across species (H~A~: μ~1~ ≠ μ~2~)*
+
+### Statistical Methods
+
+Multivariate analysis of variance (MANOVA) was selected as the primary statistical methods to investigate the aforementioned hypothesis.Designed to test impacts of independent variables (species) on multiple dependent variables simultaneously (culmen length and depth) MANOVA provides comprehensive analysis of variance across groups whilst reducing error which would arise when conducting multiple independent analyses of variance. This was followed by effect size analyses to support MANOVA outcomes, as well as post-hoc testing and linear discriminant analysis to see differences between each group using information from both dependent variables.
+
+```{r MANOVA, echo=TRUE}
+#manova
+
+culmen_manova<-manova(cbind(culmen_length_mm,culmen_depth_mm)~species,penguins_culmen)
+summary(culmen_manova)
+
+#eta_squared
+eta_squared(culmen_manova)
+
+
+#following with univariate anovas
+
+summary.aov(culmen_manova)
+
+#post hoc analysis
+
+penguins_culmen
+post_hoc_culmen <- lda(species ~ culmen_length_mm + culmen_depth_mm, data = penguins_culmen, CV = FALSE)
+post_hoc_culmen
+```
+
+### Results & Discussion
+
+```{r LDA plot, echo=TRUE}
+
+
+predict(post_hoc_culmen)
+plot_lda <- data.frame(penguins_culmen[, "species"], lda = predict(post_hoc_culmen)$x)
+lda_plot_culmen <- ggplot(plot_lda) + 
+  geom_point(aes(x = lda.LD1, y = lda.LD2, colour = species), size = 1)+
+  scale_color_manual(values = species_colours)
+lda_plot_culmen
+
+#####exporting the figure
+agg_png("figures/penguin_culmen_post_hoc.png", 
+        width = 20, 
+        height = 20, 
+        units = "cm", 
+        res = 300, 
+        scaling = 1)
+print(lda_plot_culmen)
+
+```
+
+Output of MANOVA suggested species has a statistically significant effect on both culmen length and depth with a p-value of \<2.2e-16, supported by an ETA squared value (measuring effects of independent on dependent variables) that tends closer to 1, suggesting higher proportion of variance can be explained by species differences. Following analysis with univariate analysis of variance to see how depth and length are affected by species independently, both aov.'s also show p-value ranges at \<2.2e-16, more so with length than depth. To understand which group mean vector differs specifically, linear discriminant analysis (LDA) was performed, and can be visualised by the LDA plot above. We see very little overlap between species, suggesting all are quite crucial to reject the null hypothesis of no effects of species on length and depth variables.
+
+### Conclusion
+
+Through multivariate analysis of variance,we do see significant differences in culmen qualities specified by species. However, further research to elucidate constraints on culmen length and depths and the relationship between these is key. Understanding the driving forces behind differences across species, such as food availability and resource pressures will likely be beneficial to further understanding phenotypic differences between these species. Finally, pairing phenotypic and observational work with phylogenetics may lay a solid foundation to understanding divergence and niche separation of these groups. The field proposes applications in a range of areas, form evolutionary biology to conservation through understanding climatic drivers and pressures shaping phenotypic change in these species, as well as how this is likely influenced by climate change in the Anthropocene.
+
+#### References and additional reading
+
+Bobbitt, Z. (2019) The Differences Between ANOVA, ANCOVA, MANOVA, and MANCOVA, Statology. Available at: <https://www.statology.org/differences-between-anova-ancova-manova-mancova/> (Accessed: 12 December 2024).
+
+\- Gorman, K.B., Williams, T.D. and Fraser, W.R. (2014) ‘Ecological Sexual Dimorphism and Environmental Variability within a Community of Antarctic Penguins (Genus Pygoscelis)’, PLOS ONE, 9(3), p. e90081. Available at: <https://doi.org/10.1371/journal.pone.0090081>.
+
+\- Horst, A., Hill, A. and Gorman, K.B. (2022) ‘Palmer Archipelago Penguins Data in the palmerpenguins R Package - An Alternative to Anderson’s Irises’, The R Journal, 14, pp. 244–254. Available at: <https://doi.org/10.32614/RJ-2022-020>.
